@@ -19,7 +19,7 @@ permissions:
 
 concurrency:
   group: update-orca
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   update:
@@ -33,9 +33,6 @@ jobs:
 
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@main
-
-      - name: Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@main
 
       - name: Save old version
         run: |

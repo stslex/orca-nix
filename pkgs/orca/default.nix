@@ -2,6 +2,7 @@
   appimageTools,
   fetchurl,
   lib,
+  makeWrapper,
   stdenv,
 }:
 
@@ -35,8 +36,11 @@ in
 appimageTools.wrapType2 {
   pname = "orca";
   inherit version src;
+  nativeBuildInputs = [ makeWrapper ];
 
   extraInstallCommands = ''
+    wrapProgram $out/bin/orca --add-flags --no-sandbox
+
     install -Dm444 ${contents}/orca-ide.desktop $out/share/applications/orca.desktop
     substituteInPlace $out/share/applications/orca.desktop \
       --replace-fail 'Exec=AppRun --no-sandbox %U' 'Exec=orca %U'
