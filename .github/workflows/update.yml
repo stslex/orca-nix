@@ -1,0 +1,94 @@
+name: Update Orca
+
+on:
+  schedule:
+    - cron: "30 3 * * *"
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Pin to a specific version (leave empty for latest stable)"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-orca
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Save old version
+        run: |
+          OLD=$(jq -r .version pkgs/orca/version.json)
+          echo "OLD=$OLD" >> "$GITHUB_ENV"
+
+      - name: Run update script
+        run: |
+          if [[ -n "${{ inputs.version }}" ]]; then
+            ./scripts/update.sh "${{ inputs.version }}"
+          else
+            ./scripts/update.sh
+          fi
+
+      - name: Save new version
+        run: |
+          NEW=$(jq -r .version pkgs/orca/version.json)
+          echo "NEW=$NEW" >> "$GITHUB_ENV"
+
+      - name: Build and verify
+        if: env.OLD != env.NEW || github.event_name == 'push'
+        run: |
+          nix build .#orca
+          DESKTOP=./result/share/applications/orca.desktop
+          ACTUAL=$(sed -n 's/^X-AppImage-Version=//p' "$DESKTOP")
+          echo "Built AppImage version: $ACTUAL"
+          if [[ "$ACTUAL" != "$NEW" ]]; then
+            echo "::error::Version mismatch: expected $NEW, got $ACTUAL"
+            exit 1
+          fi
+          grep -q '^Exec=orca %U$' "$DESKTOP"
+
+          SMOKE_HOME=$(mktemp -d)
+          set +e
+          nix develop -c env \
+            HOME="$SMOKE_HOME" \
+            XDG_CONFIG_HOME="$SMOKE_HOME/config" \
+            XDG_DATA_HOME="$SMOKE_HOME/data" \
+            xvfb-run -a timeout 15s ./result/bin/orca \
+              >"$SMOKE_HOME/orca.log" 2>&1
+          STATUS=$?
+          set -e
+          if [[ "$STATUS" -ne 124 ]]; then
+            cat "$SMOKE_HOME/orca.log"
+            echo "::error::Orca exited during the bounded smoke test (status $STATUS)"
+            exit 1
+          fi
+
+      - name: Commit and push
+        if: env.OLD != env.NEW
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pkgs/orca/version.json
+          git commit -m "orca: $OLD → $NEW"
+          git push
