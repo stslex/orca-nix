@@ -40,7 +40,6 @@
               jq
               nixfmt
               shellcheck
-              xvfb-run
             ];
           };
         }

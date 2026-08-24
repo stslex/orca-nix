@@ -65,8 +65,9 @@ Linux AppImages and writes a reproducible `version.json`.
 
 GitHub Actions checks for a new stable release daily, builds the x86_64 Linux
 package, verifies the version embedded in the extracted AppImage desktop entry,
-runs a bounded launch smoke test under Xvfb, then commits and pushes the version
-bump. The smoke test uses an isolated temporary home directory.
+verifies the rewritten launcher command, then commits and pushes the version
+bump. The AppImage wrapper itself uses bubblewrap and cannot run on GitHub-hosted
+runners, which disable the required uid mapping.
 
 Consumers remain pinned by their own `flake.lock`. Update a consumer with:
 

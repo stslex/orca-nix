@@ -61,22 +61,6 @@ jobs:
           fi
           grep -q '^Exec=orca %U$' "$DESKTOP"
 
-          SMOKE_HOME=$(mktemp -d)
-          set +e
-          nix develop -c env \
-            HOME="$SMOKE_HOME" \
-            XDG_CONFIG_HOME="$SMOKE_HOME/config" \
-            XDG_DATA_HOME="$SMOKE_HOME/data" \
-            xvfb-run -a timeout 15s ./result/bin/orca \
-              >"$SMOKE_HOME/orca.log" 2>&1
-          STATUS=$?
-          set -e
-          if [[ "$STATUS" -ne 124 ]]; then
-            cat "$SMOKE_HOME/orca.log"
-            echo "::error::Orca exited during the bounded smoke test (status $STATUS)"
-            exit 1
-          fi
-
       - name: Commit and push
         if: env.OLD != env.NEW
         run: |
