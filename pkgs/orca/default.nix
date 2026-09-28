@@ -41,9 +41,15 @@ appimageTools.wrapType2 {
   extraInstallCommands = ''
     wrapProgram $out/bin/orca --add-flags --no-sandbox
 
+    # Upstream has shipped both `Exec=AppRun --no-sandbox %U` and `Exec=AppRun %U`;
+    # the wrapper already adds --no-sandbox, so point every Exec at it either way.
     install -Dm444 ${contents}/orca-ide.desktop $out/share/applications/orca.desktop
-    substituteInPlace $out/share/applications/orca.desktop \
-      --replace-fail 'Exec=AppRun --no-sandbox %U' 'Exec=orca %U'
+    sed -i -E 's|^Exec=AppRun( --no-sandbox)?|Exec=orca|' $out/share/applications/orca.desktop
+    if grep -q AppRun $out/share/applications/orca.desktop \
+      || ! grep -q '^Exec=orca' $out/share/applications/orca.desktop; then
+      echo "orca.desktop: unexpected Exec line, update the rewrite above" >&2
+      exit 1
+    fi
 
     install -Dm444 ${contents}/usr/share/icons/hicolor/512x512/apps/orca-ide.png \
       $out/share/icons/hicolor/512x512/apps/orca-ide.png
