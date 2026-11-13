@@ -12,10 +12,18 @@ fi
 
 if [[ $# -eq 1 ]]; then
   REQUESTED_VERSION="${1#v}"
-  RELEASE=$(curl -fsSL "$ASSET_API/tags/v$REQUESTED_VERSION")
+  RELEASE_URL="$ASSET_API/tags/v$REQUESTED_VERSION"
 else
-  RELEASE=$(curl -fsSL "$ASSET_API/latest")
+  RELEASE_URL="$ASSET_API/latest"
 fi
+
+RELEASE_FILE=$(mktemp)
+trap 'rm -f "$RELEASE_FILE"' EXIT
+# File output lets curl discard a partial response before retrying.
+curl -fsSL --connect-timeout 10 --max-time 30 \
+  --retry 3 --retry-connrefused --retry-max-time 120 \
+  --output "$RELEASE_FILE" "$RELEASE_URL"
+RELEASE=$(cat "$RELEASE_FILE")
 
 if [[ $(jq -r '.draft == false and .prerelease == false' <<<"$RELEASE") != true ]]; then
   echo "orca: release is not stable" >&2
